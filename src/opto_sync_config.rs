@@ -640,15 +640,15 @@ bind_addr_binding = "bind_addr"
     fn rejects_secret_default() {
         let invalid = server_config().replace(
             "[server]",
-            "[[env]]\
-name = \"database_url\"\
-key = \"DATABASE_URL\"\
-kind = \"url\"\
-required = true\
-secret = true\
-default = \"postgres://plaintext\"\
-\
-[server]",
+            r#"[[env]]
+name = "database_url"
+key = "DATABASE_URL"
+kind = "url"
+required = true
+secret = true
+default = "postgres://plaintext"
+
+[server]"#,
         );
         assert!(matches!(
             parse_opto_sync_config(&invalid),
