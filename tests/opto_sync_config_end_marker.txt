@@ -1,0 +1,1 @@
+DEN-3959 config runtime hardening complete on this branch; CI is the next gate.
