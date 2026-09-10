@@ -1,0 +1,19 @@
+{
+  "schema": "opto-sync.config-source/v1",
+  "authority": {
+    "repository": "opto-sync/opto-sync-interfaces",
+    "commit": "91390f0e1a76ae809f84f51c91e3f4cd4160a07c",
+    "typespec": "contracts/opto-sync-config/opto-sync-config.tsp",
+    "jsonSchema": "contracts/opto-sync-config/opto-sync-config.schema.json"
+  },
+  "admission": {
+    "validatorRepository": "ORESoftware/typespec-json-schema-validator",
+    "validatorCommit": "4a5d049218adc2740d4cf78f612caf7f38f6f64c",
+    "status": "passed"
+  },
+  "runtimeProjection": {
+    "module": "src/opto_sync_config.rs",
+    "role": "implementation-projection",
+    "authority": false
+  }
+}
