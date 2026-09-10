@@ -12,10 +12,8 @@ use url::Url;
 
 pub const OPTO_SYNC_CONFIG_FILENAME: &str = ".opto-sync.toml";
 pub const OPTO_SYNC_CONFIG_CONTRACT_REPOSITORY: &str = "opto-sync/opto-sync-interfaces";
-pub const OPTO_SYNC_CONFIG_CONTRACT_REVISION: &str =
-    "91390f0e1a76ae809f84f51c91e3f4cd4160a07c";
-pub const OPTO_SYNC_CONFIG_TJSV_REVISION: &str =
-    "4a5d049218adc2740d4cf78f612caf7f38f6f64c";
+pub const OPTO_SYNC_CONFIG_CONTRACT_REVISION: &str = "91390f0e1a76ae809f84f51c91e3f4cd4160a07c";
+pub const OPTO_SYNC_CONFIG_TJSV_REVISION: &str = "4a5d049218adc2740d4cf78f612caf7f38f6f64c";
 pub const MAX_CONFIG_FILE_BYTES: usize = 256 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -252,7 +250,10 @@ pub enum OptoSyncConfigError {
     #[error("Opto Sync role is inconsistent with mode: {0}")]
     ModeRoleMismatch(&'static str),
     #[error("unknown Opto Sync binding reference {binding} at {field}")]
-    UnknownBindingReference { field: &'static str, binding: String },
+    UnknownBindingReference {
+        field: &'static str,
+        binding: String,
+    },
     #[error("Opto Sync binding {binding} at {field} must use kind {expected:?}")]
     BindingKindMismatch {
         field: &'static str,
@@ -260,7 +261,10 @@ pub enum OptoSyncConfigError {
         expected: EnvKind,
     },
     #[error("Opto Sync binding {binding} at {field} has invalid secret policy")]
-    BindingSecretMismatch { field: &'static str, binding: String },
+    BindingSecretMismatch {
+        field: &'static str,
+        binding: String,
+    },
     #[error("invalid boolean value for Opto Sync binding: {0}")]
     InvalidBoolean(String),
     #[error("invalid integer value for Opto Sync binding: {0}")]
@@ -283,8 +287,11 @@ pub fn parse_opto_sync_config(input: &str) -> Result<OptoSyncConfig, OptoSyncCon
     Ok(config)
 }
 
-pub fn load_opto_sync_config(path: impl AsRef<Path>) -> Result<OptoSyncConfig, OptoSyncConfigError> {
-    let bytes = fs::read(path.as_ref()).map_err(|error| OptoSyncConfigError::Io(error.to_string()))?;
+pub fn load_opto_sync_config(
+    path: impl AsRef<Path>,
+) -> Result<OptoSyncConfig, OptoSyncConfigError> {
+    let bytes =
+        fs::read(path.as_ref()).map_err(|error| OptoSyncConfigError::Io(error.to_string()))?;
     if bytes.len() > MAX_CONFIG_FILE_BYTES {
         return Err(OptoSyncConfigError::TooLarge);
     }
@@ -318,16 +325,24 @@ pub fn validate_opto_sync_config(config: &OptoSyncConfig) -> Result<(), OptoSync
     let mut by_name = BTreeMap::new();
     for binding in &config.env {
         if !is_binding_name(&binding.name) {
-            return Err(OptoSyncConfigError::InvalidBindingName(binding.name.clone()));
+            return Err(OptoSyncConfigError::InvalidBindingName(
+                binding.name.clone(),
+            ));
         }
         if !is_environment_key(&binding.key) {
-            return Err(OptoSyncConfigError::InvalidEnvironmentKey(binding.key.clone()));
+            return Err(OptoSyncConfigError::InvalidEnvironmentKey(
+                binding.key.clone(),
+            ));
         }
         if !names.insert(binding.name.as_str()) {
-            return Err(OptoSyncConfigError::DuplicateBindingName(binding.name.clone()));
+            return Err(OptoSyncConfigError::DuplicateBindingName(
+                binding.name.clone(),
+            ));
         }
         if !keys.insert(binding.key.as_str()) {
-            return Err(OptoSyncConfigError::DuplicateEnvironmentKey(binding.key.clone()));
+            return Err(OptoSyncConfigError::DuplicateEnvironmentKey(
+                binding.key.clone(),
+            ));
         }
         if binding.secret && binding.default_value.is_some() {
             return Err(OptoSyncConfigError::SecretDefault(binding.name.clone()));
@@ -391,7 +406,11 @@ pub fn merge_environment(
     argv_overrides: &BTreeMap<String, String>,
 ) -> BTreeMap<String, String> {
     let mut merged = ambient.clone();
-    merged.extend(argv_overrides.iter().map(|(key, value)| (key.clone(), value.clone())));
+    merged.extend(
+        argv_overrides
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone())),
+    );
     merged
 }
 
@@ -421,13 +440,17 @@ pub fn resolve_opto_sync_config(
 
         let Some((raw_value, source)) = resolved else {
             if binding.required {
-                return Err(OptoSyncConfigError::MissingRequiredBinding(binding.name.clone()));
+                return Err(OptoSyncConfigError::MissingRequiredBinding(
+                    binding.name.clone(),
+                ));
             }
             continue;
         };
 
         if binding.required && raw_value.is_empty() {
-            return Err(OptoSyncConfigError::MissingRequiredBinding(binding.name.clone()));
+            return Err(OptoSyncConfigError::MissingRequiredBinding(
+                binding.name.clone(),
+            ));
         }
 
         values.insert(
@@ -490,13 +513,12 @@ fn validate_reference(
     let Some(reference) = reference else {
         return Ok(());
     };
-    let binding = by_name
-        .get(reference)
-        .copied()
-        .ok_or_else(|| OptoSyncConfigError::UnknownBindingReference {
+    let binding = by_name.get(reference).copied().ok_or_else(|| {
+        OptoSyncConfigError::UnknownBindingReference {
             field,
             binding: reference.to_owned(),
-        })?;
+        }
+    })?;
     if binding.kind != expected_kind {
         return Err(OptoSyncConfigError::BindingKindMismatch {
             field,
@@ -516,14 +538,18 @@ fn validate_reference(
 fn is_binding_name(value: &str) -> bool {
     let mut chars = value.chars();
     matches!(chars.next(), Some('a'..='z'))
-        && chars.all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_')
+        && chars.all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
+        })
         && value.len() <= 64
 }
 
 fn is_environment_key(value: &str) -> bool {
     let mut chars = value.chars();
     matches!(chars.next(), Some('A'..='Z') | Some('_'))
-        && chars.all(|character| character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_')
+        && chars.all(|character| {
+            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+        })
         && value.len() <= 128
 }
 
@@ -604,14 +630,25 @@ bind_addr_binding = "bind_addr"
         let resolved = resolve_opto_sync_config(&parsed, &ambient, &argv).expect("resolved");
         let binding = resolved.binding("bind_addr").expect("binding");
         assert_eq!(binding.source(), ValueSource::Argv);
-        assert_eq!(binding.value(), &ConfigValue::String("127.0.0.1:8082".to_owned()));
+        assert_eq!(
+            binding.value(),
+            &ConfigValue::String("127.0.0.1:8082".to_owned())
+        );
     }
 
     #[test]
     fn rejects_secret_default() {
         let invalid = server_config().replace(
             "[server]",
-            "[[env]]\nname = \"database_url\"\nkey = \"DATABASE_URL\"\nkind = \"url\"\nrequired = true\nsecret = true\ndefault = \"postgres://plaintext\"\n\n[server]",
+            "[[env]]\
+name = \"database_url\"\
+key = \"DATABASE_URL\"\
+kind = \"url\"\
+required = true\
+secret = true\
+default = \"postgres://plaintext\"\
+\
+[server]",
         );
         assert!(matches!(
             parse_opto_sync_config(&invalid),
