@@ -159,35 +159,26 @@ fn rejects_binding_identifiers_beyond_contract_limits() {
     let key_129 = format!("A{}", "B".repeat(128));
 
     let valid_name = server_config()
-        .replace(
-            "name = \"bind_addr\"",
-            &format!("name = \"{name_64}\""),
-        )
+        .replace("name = \"bind_addr\"", &format!("name = \"{name_64}\""))
         .replace(
             "bind_addr_binding = \"bind_addr\"",
             &format!("bind_addr_binding = \"{name_64}\""),
         );
     parse_opto_sync_config(&valid_name).expect("64-character binding name must be accepted");
 
-    let invalid_name = server_config().replace(
-        "name = \"bind_addr\"",
-        &format!("name = \"{name_65}\""),
-    );
+    let invalid_name =
+        server_config().replace("name = \"bind_addr\"", &format!("name = \"{name_65}\""));
     assert!(matches!(
         parse_opto_sync_config(&invalid_name),
         Err(OptoSyncConfigError::InvalidBindingName(name)) if name == name_65
     ));
 
-    let valid_key = server_config().replace(
-        "key = \"OPTO_SYNC_BIND\"",
-        &format!("key = \"{key_128}\""),
-    );
+    let valid_key =
+        server_config().replace("key = \"OPTO_SYNC_BIND\"", &format!("key = \"{key_128}\""));
     parse_opto_sync_config(&valid_key).expect("128-character environment key must be accepted");
 
-    let invalid_key = server_config().replace(
-        "key = \"OPTO_SYNC_BIND\"",
-        &format!("key = \"{key_129}\""),
-    );
+    let invalid_key =
+        server_config().replace("key = \"OPTO_SYNC_BIND\"", &format!("key = \"{key_129}\""));
     assert!(matches!(
         parse_opto_sync_config(&invalid_key),
         Err(OptoSyncConfigError::InvalidEnvironmentKey(key)) if key == key_129
@@ -221,10 +212,7 @@ fn rejects_secret_argv_override_even_when_environment_has_a_value() {
         "OPTO_SYNC_AUTH_TOKEN".to_owned(),
         "environment-secret".to_owned(),
     )]);
-    let argv = BTreeMap::from([(
-        "OPTO_SYNC_AUTH_TOKEN".to_owned(),
-        "argv-secret".to_owned(),
-    )]);
+    let argv = BTreeMap::from([("OPTO_SYNC_AUTH_TOKEN".to_owned(), "argv-secret".to_owned())]);
     assert!(matches!(
         resolve_opto_sync_config(&parsed, &ambient, &argv),
         Err(OptoSyncConfigError::SecretFromArgv(name)) if name == "auth_token"
