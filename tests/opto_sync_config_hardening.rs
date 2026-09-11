@@ -69,7 +69,7 @@ auth_token_binding = "auth_token"
 
 #[test]
 fn rejects_unknown_top_level_fields() {
-    let invalid = format!("{}\nunexpected = true\n", server_config());
+    let invalid = format!("unexpected = true\n{}", server_config());
     assert!(matches!(
         parse_opto_sync_config(&invalid),
         Err(OptoSyncConfigError::Toml(_))
@@ -90,11 +90,24 @@ fn enforces_sync_policy_boundaries() {
         .replace("max_batch_size = 256", "max_batch_size = 10000");
     parse_opto_sync_config(&valid_max).expect("maximum policy bounds must be accepted");
 
-    for (needle, replacement, expected_field) in [
-        ("push_interval_ms = 3000", "push_interval_ms = 99", "push_interval_ms"),
-        ("pull_interval_ms = 3000", "pull_interval_ms = 3600001", "pull_interval_ms"),
-        ("max_batch_size = 256", "max_batch_size = 0", "max_batch_size"),
-    ] {
+    let cases = [
+        (
+            "push_interval_ms = 3000",
+            "push_interval_ms = 99",
+            "push_interval_ms",
+        ),
+        (
+            "pull_interval_ms = 3000",
+            "pull_interval_ms = 3600001",
+            "pull_interval_ms",
+        ),
+        (
+            "max_batch_size = 256",
+            "max_batch_size = 0",
+            "max_batch_size",
+        ),
+    ];
+    for (needle, replacement, expected_field) in cases {
         let invalid = server_config().replace(needle, replacement);
         assert!(matches!(
             parse_opto_sync_config(&invalid),
@@ -146,7 +159,10 @@ fn rejects_binding_identifiers_beyond_contract_limits() {
     let key_129 = format!("A{}", "B".repeat(128));
 
     let valid_name = server_config()
-        .replace("name = \"bind_addr\"", &format!("name = \"{name_64}\""))
+        .replace(
+            "name = \"bind_addr\"",
+            &format!("name = \"{name_64}\""),
+        )
         .replace(
             "bind_addr_binding = \"bind_addr\"",
             &format!("bind_addr_binding = \"{name_64}\""),
