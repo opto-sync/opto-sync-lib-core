@@ -213,11 +213,7 @@ mod tests {
         fs::create_dir_all(root.join(".git")).expect("git dir");
         fs::create_dir_all(&nested).expect("nested dir");
         fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("root config");
-        fs::write(
-            nested.join(OPTO_SYNC_CONFIG_FILENAME),
-            "version = 1\n",
-        )
-        .expect("nested config");
+        fs::write(nested.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("nested config");
 
         let found = discover_opto_sync_config(nested.join("src")).expect("discover nearest");
         assert_eq!(found.path, nested.join(OPTO_SYNC_CONFIG_FILENAME));
@@ -239,11 +235,7 @@ mod tests {
 
         let worktree = scratch("root-file");
         fs::write(worktree.join(".git"), "gitdir: /elsewhere\n").expect("git file");
-        fs::write(
-            worktree.join(OPTO_SYNC_CONFIG_FILENAME),
-            "version = 1\n",
-        )
-        .expect("config");
+        fs::write(worktree.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("config");
         assert!(
             !discover_opto_sync_config(&worktree)
                 .expect("find")
@@ -259,11 +251,7 @@ mod tests {
         let deep = repo.join("services/api");
         fs::create_dir_all(repo.join(".git")).expect("git dir");
         fs::create_dir_all(&deep).expect("deep");
-        fs::write(
-            outer.join(OPTO_SYNC_CONFIG_FILENAME),
-            "version = 1\n",
-        )
-        .expect("outer config");
+        fs::write(outer.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("outer config");
 
         let error = discover_opto_sync_config(&deep).expect_err("must stop at repo boundary");
         assert!(matches!(
@@ -311,11 +299,7 @@ mod tests {
             deep.push(format!("d{index}"));
         }
         fs::create_dir_all(&deep).expect("deep tree");
-        fs::write(
-            root.join(OPTO_SYNC_CONFIG_FILENAME),
-            "version = 1\n",
-        )
-        .expect("too-far config");
+        fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("too-far config");
         let error =
             discover_opto_sync_config(&deep).expect_err("too-far config must not be selected");
         assert!(matches!(
