@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod config;
+pub mod config_discovery;
 pub mod connection;
 pub mod error;
 pub mod flavor;
@@ -8,6 +9,12 @@ pub mod opto_sync_config;
 pub mod schema;
 
 pub use config::CoreConfig;
+pub use config_discovery::{
+    discover_opto_sync_config, discover_opto_sync_config_from_cwd, load_nearest_opto_sync_config,
+    load_nearest_opto_sync_config_from_cwd, load_nearest_opto_sync_config_from_cwd_with_source,
+    load_nearest_opto_sync_config_with_source, DiscoveredOptoSyncConfig, LoadedOptoSyncConfig,
+    OptoSyncConfigDiscoveryError, MAX_DISCOVERY_ANCESTORS,
+};
 pub use connection::CorePool;
 pub use error::CoreError;
 pub use flavor::DatabaseFlavor;
