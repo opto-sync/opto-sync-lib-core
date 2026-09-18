@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
-use std::{fs, path::{Path, PathBuf}, sync::OnceLock};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 use thiserror::Error;
 
@@ -91,9 +95,7 @@ pub fn discover_opto_sync_config(
         match fs::symlink_metadata(&candidate) {
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() || !metadata.is_file() {
-                    return Err(OptoSyncConfigDiscoveryError::UnsafeConfigLeaf {
-                        path: candidate,
-                    });
+                    return Err(OptoSyncConfigDiscoveryError::UnsafeConfigLeaf { path: candidate });
                 }
                 let discovered = DiscoveredOptoSyncConfig {
                     path: candidate,
@@ -188,14 +190,18 @@ fn discovery_logger() -> &'static next_loggers::Logger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     fn scratch(name: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock after epoch")
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("opto-sync-{name}-{}-{nonce}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("opto-sync-{name}-{}-{nonce}", std::process::id()));
         fs::create_dir_all(&root).expect("root");
         root
     }
@@ -207,7 +213,11 @@ mod tests {
         fs::create_dir_all(root.join(".git")).expect("git dir");
         fs::create_dir_all(&nested).expect("nested dir");
         fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("root config");
-        fs::write(nested.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("nested config");
+        fs::write(
+            nested.join(OPTO_SYNC_CONFIG_FILENAME),
+            "version = 1\n",
+        )
+        .expect("nested config");
 
         let found = discover_opto_sync_config(nested.join("src")).expect("discover nearest");
         assert_eq!(found.path, nested.join(OPTO_SYNC_CONFIG_FILENAME));
@@ -220,13 +230,25 @@ mod tests {
         let root = scratch("root-dir");
         fs::create_dir_all(root.join(".git")).expect("git dir");
         fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("config");
-        assert!(discover_opto_sync_config(&root).expect("find").at_repository_root);
+        assert!(
+            discover_opto_sync_config(&root)
+                .expect("find")
+                .at_repository_root
+        );
         fs::remove_dir_all(root).expect("cleanup");
 
         let worktree = scratch("root-file");
         fs::write(worktree.join(".git"), "gitdir: /elsewhere\n").expect("git file");
-        fs::write(worktree.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("config");
-        assert!(!discover_opto_sync_config(&worktree).expect("find").at_repository_root);
+        fs::write(
+            worktree.join(OPTO_SYNC_CONFIG_FILENAME),
+            "version = 1\n",
+        )
+        .expect("config");
+        assert!(
+            !discover_opto_sync_config(&worktree)
+                .expect("find")
+                .at_repository_root
+        );
         fs::remove_dir_all(worktree).expect("cleanup");
     }
 
@@ -237,10 +259,17 @@ mod tests {
         let deep = repo.join("services/api");
         fs::create_dir_all(repo.join(".git")).expect("git dir");
         fs::create_dir_all(&deep).expect("deep");
-        fs::write(outer.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("outer config");
+        fs::write(
+            outer.join(OPTO_SYNC_CONFIG_FILENAME),
+            "version = 1\n",
+        )
+        .expect("outer config");
 
         let error = discover_opto_sync_config(&deep).expect_err("must stop at repo boundary");
-        assert!(matches!(error, OptoSyncConfigDiscoveryError::NotFound { .. }));
+        assert!(matches!(
+            error,
+            OptoSyncConfigDiscoveryError::NotFound { .. }
+        ));
         fs::remove_dir_all(outer).expect("cleanup");
     }
 
@@ -250,7 +279,10 @@ mod tests {
         fs::create_dir_all(root.join(".git")).expect("git dir");
         fs::write(root.join(".opto-cfg.toml"), "version = 1\n").expect("stale name");
         let error = discover_opto_sync_config(&root).expect_err("unregistered name must not load");
-        assert!(matches!(error, OptoSyncConfigDiscoveryError::NotFound { .. }));
+        assert!(matches!(
+            error,
+            OptoSyncConfigDiscoveryError::NotFound { .. }
+        ));
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -264,7 +296,10 @@ mod tests {
         fs::write(&real, "version = 1\n").expect("real");
         symlink(&real, root.join(OPTO_SYNC_CONFIG_FILENAME)).expect("symlink");
         let error = discover_opto_sync_config(&root).expect_err("symlink must fail closed");
-        assert!(matches!(error, OptoSyncConfigDiscoveryError::UnsafeConfigLeaf { .. }));
+        assert!(matches!(
+            error,
+            OptoSyncConfigDiscoveryError::UnsafeConfigLeaf { .. }
+        ));
         fs::remove_dir_all(root).expect("cleanup");
     }
 
@@ -276,9 +311,17 @@ mod tests {
             deep.push(format!("d{index}"));
         }
         fs::create_dir_all(&deep).expect("deep tree");
-        fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("too-far config");
-        let error = discover_opto_sync_config(&deep).expect_err("too-far config must not be selected");
-        assert!(matches!(error, OptoSyncConfigDiscoveryError::NotFound { .. }));
+        fs::write(
+            root.join(OPTO_SYNC_CONFIG_FILENAME),
+            "version = 1\n",
+        )
+        .expect("too-far config");
+        let error =
+            discover_opto_sync_config(&deep).expect_err("too-far config must not be selected");
+        assert!(matches!(
+            error,
+            OptoSyncConfigDiscoveryError::NotFound { .. }
+        ));
         fs::remove_dir_all(root).expect("cleanup");
     }
 }
