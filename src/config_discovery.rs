@@ -70,7 +70,8 @@ fn has_git_boundary(directory: &Path) -> bool {
 
 #[must_use]
 pub fn is_repo_root(directory: &Path) -> bool {
-    directory.join(".git").is_dir()
+    fs::symlink_metadata(directory.join(".git"))
+        .is_ok_and(|metadata| metadata.file_type().is_dir())
 }
 
 /// Finds the nearest canonical Opto Sync config while walking from `start`
@@ -242,6 +243,27 @@ mod tests {
                 .at_repository_root
         );
         fs::remove_dir_all(worktree).expect("cleanup");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_git_directory_is_boundary_but_not_root_placement() {
+        use std::os::unix::fs::symlink;
+
+        let root = scratch("git-symlink");
+        let actual_git = root.join("actual-git");
+        fs::create_dir_all(&actual_git).expect("actual git dir");
+        symlink(&actual_git, root.join(".git")).expect("git symlink");
+        fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("config");
+
+        assert!(has_git_boundary(&root));
+        assert!(!is_repo_root(&root));
+        assert!(
+            !discover_opto_sync_config(&root)
+                .expect("find")
+                .at_repository_root
+        );
+        fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]
