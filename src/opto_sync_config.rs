@@ -304,6 +304,28 @@ pub fn load_repo_root(repo_root: impl AsRef<Path>) -> Result<OptoSyncConfig, Opt
     load_opto_sync_config(repo_root.as_ref().join(OPTO_SYNC_CONFIG_FILENAME))
 }
 
+/// Locates `.opto-sync.toml` by walking up from the working directory and
+/// loads the first match.
+///
+/// Discovery never crosses a repository boundary. A file found below the
+/// repository root is used but reported through the fleet logger, so a stray
+/// copy that shadows the real one is visible rather than mysterious.
+/// `Ok(None)` means no file exists on the ancestor chain.
+pub fn discover() -> Result<Option<OptoSyncConfig>, OptoSyncConfigError> {
+    let start =
+        std::env::current_dir().map_err(|error| OptoSyncConfigError::Io(error.to_string()))?;
+    discover_from(&start)
+}
+
+/// [`discover`] from an explicit starting directory.
+pub fn discover_from(start: &Path) -> Result<Option<OptoSyncConfig>, OptoSyncConfigError> {
+    match ores_config_discovery::locate_and_report_from(start, OPTO_SYNC_CONFIG_FILENAME) {
+        Ok(Some(located)) => load_opto_sync_config(located.path).map(Some),
+        Ok(None) => Ok(None),
+        Err(error) => Err(OptoSyncConfigError::Io(error.to_string())),
+    }
+}
+
 pub fn validate_opto_sync_config(config: &OptoSyncConfig) -> Result<(), OptoSyncConfigError> {
     if config.version != 1 {
         return Err(OptoSyncConfigError::UnsupportedVersion(config.version));
@@ -710,4 +732,68 @@ auth_token_binding = "auth_token"
         assert!(rendered.contains("[REDACTED]"));
         assert!(!rendered.contains("super-secret"));
     }
+}
+
+#[cfg(test)]
+mod discovery_tests {
+    use super::*;
+
+    fn fixture(tag: &str) -> std::path::PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("opto-sync-discover-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".git")).unwrap();
+        fs::create_dir_all(root.join("src/deep")).unwrap();
+        root
+    }
+
+    #[test]
+    fn discover_from_a_nested_directory_loads_the_repository_root_config() {
+        let root = fixture("nested");
+        fs::write(
+            root.join(OPTO_SYNC_CONFIG_FILENAME),
+            VALID_DISCOVERY_FIXTURE,
+        )
+        .unwrap();
+        let config = discover_from(&root.join("src/deep"))
+            .expect("discovery succeeds")
+            .expect("located");
+        assert_eq!(config.version, 1);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn discover_with_no_config_is_none_not_an_error() {
+        let root = fixture("absent");
+        assert!(discover_from(&root.join("src/deep")).unwrap().is_none());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    const VALID_DISCOVERY_FIXTURE: &str = r#"
+version = 1
+mode = "server"
+strict = true
+
+[flags2env]
+contract = ".cli-flags.toml"
+require_audit = true
+precedence = "argv-over-env"
+
+[sync]
+push_interval_ms = 5000
+pull_interval_ms = 5000
+max_batch_size = 64
+conflict_policy = "manual"
+
+[[env]]
+name = "audit_capacity"
+key = "OPTO_SYNC_MCP_AUDIT_CAPACITY"
+kind = "integer"
+required = false
+secret = false
+default = "128"
+
+[server]
+enabled = true
+"#;
 }
