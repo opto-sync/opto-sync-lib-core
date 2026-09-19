@@ -13,7 +13,7 @@ use crate::opto_sync_config::{
 };
 
 /// Hard ceiling on implicit ancestor discovery.
-pub const MAX_DISCOVERY_ANCESTORS: usize = 64;
+pub const MAX_DISCOVERY_ANCESTORS: usize = ores_config_discovery::MAX_ANCESTORS;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiscoveredOptoSyncConfig {
@@ -60,14 +60,6 @@ fn starting_directory(start: &Path) -> PathBuf {
     }
 }
 
-/// A `.git` file or directory is a trust-boundary marker. Worktrees and
-/// submodules use a `.git` file; discovery must not walk through that boundary
-/// into a parent repository even though a `.git` file does not count as
-/// repository-root *placement* evidence.
-fn has_git_boundary(directory: &Path) -> bool {
-    fs::symlink_metadata(directory.join(".git")).is_ok()
-}
-
 #[must_use]
 pub fn is_repo_root(directory: &Path) -> bool {
     directory.join(".git").is_dir()
@@ -90,35 +82,38 @@ pub fn discover_opto_sync_config(
 ) -> Result<DiscoveredOptoSyncConfig, OptoSyncConfigDiscoveryError> {
     let start = starting_directory(start.as_ref());
 
-    for directory in start.ancestors().take(MAX_DISCOVERY_ANCESTORS) {
-        let candidate = directory.join(OPTO_SYNC_CONFIG_FILENAME);
-        match fs::symlink_metadata(&candidate) {
-            Ok(metadata) => {
-                if metadata.file_type().is_symlink() || !metadata.is_file() {
-                    return Err(OptoSyncConfigDiscoveryError::UnsafeConfigLeaf { path: candidate });
+    // The walk is the fleet-wide primitive (ores-config-discovery): at most 64
+    // ancestors, never past the first Git boundary of either kind, symlinked
+    // leaves refused. This crate's own policy stays here: a non-regular leaf is
+    // an error rather than skipped, only a `.git` *directory* is root
+    // placement, and a missing config is NotFound.
+    let located = ores_config_discovery::Search::new(OPTO_SYNC_CONFIG_FILENAME)
+        .refuse_non_regular(true)
+        .from(&start)
+        .map_err(|error| match error {
+            ores_config_discovery::DiscoveryError::Unreadable { path, kind } => {
+                OptoSyncConfigDiscoveryError::Metadata {
+                    path,
+                    source: std::io::Error::from(kind),
                 }
-                let discovered = DiscoveredOptoSyncConfig {
-                    path: candidate,
-                    at_repository_root: is_repo_root(directory),
-                };
-                warn_unless_repo_root(&discovered);
-                return Ok(discovered);
             }
-            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return Err(OptoSyncConfigDiscoveryError::Metadata {
-                    path: candidate,
-                    source,
-                });
+            ores_config_discovery::DiscoveryError::Symlink(path)
+            | ores_config_discovery::DiscoveryError::NotRegularFile(path) => {
+                OptoSyncConfigDiscoveryError::UnsafeConfigLeaf { path }
             }
-        }
-
-        if has_git_boundary(directory) {
-            break;
-        }
-    }
-
-    Err(OptoSyncConfigDiscoveryError::NotFound { start })
+            _ => OptoSyncConfigDiscoveryError::NotFound {
+                start: start.clone(),
+            },
+        })?;
+    let Some(located) = located else {
+        return Err(OptoSyncConfigDiscoveryError::NotFound { start });
+    };
+    let discovered = DiscoveredOptoSyncConfig {
+        at_repository_root: located.beside_git_directory(),
+        path: located.path,
+    };
+    warn_unless_repo_root(&discovered);
+    Ok(discovered)
 }
 
 pub fn discover_opto_sync_config_from_cwd(
