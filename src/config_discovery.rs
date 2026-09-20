@@ -205,14 +205,31 @@ mod tests {
     fn nearest_canonical_config_wins_and_retains_source_path() {
         let root = scratch("nearest");
         let nested = root.join("services/api");
+        let start = nested.join("src");
         fs::create_dir_all(root.join(".git")).expect("git dir");
-        fs::create_dir_all(&nested).expect("nested dir");
+        fs::create_dir_all(&start).expect("start dir");
         fs::write(root.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("root config");
         fs::write(nested.join(OPTO_SYNC_CONFIG_FILENAME), "version = 1\n").expect("nested config");
 
-        let found = discover_opto_sync_config(nested.join("src")).expect("discover nearest");
+        let found = discover_opto_sync_config(&start).expect("discover nearest");
         assert_eq!(found.path, nested.join(OPTO_SYNC_CONFIG_FILENAME));
         assert!(!found.at_repository_root);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn nonexistent_start_fails_closed_as_metadata_error() {
+        let root = scratch("missing-start");
+        let missing = root.join("does/not/exist");
+        let error =
+            discover_opto_sync_config(&missing).expect_err("missing start must fail closed");
+        match error {
+            OptoSyncConfigDiscoveryError::Metadata { path, source } => {
+                assert_eq!(path, missing);
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+            }
+            other => panic!("expected metadata error for missing start, got {other:?}"),
+        }
         fs::remove_dir_all(root).expect("cleanup");
     }
 
