@@ -221,7 +221,8 @@ mod tests {
     fn nonexistent_start_fails_closed_as_metadata_error() {
         let root = scratch("missing-start");
         let missing = root.join("does/not/exist");
-        let error = discover_opto_sync_config(&missing).expect_err("missing start must fail closed");
+        let error =
+            discover_opto_sync_config(&missing).expect_err("missing start must fail closed");
         match error {
             OptoSyncConfigDiscoveryError::Metadata { path, source } => {
                 assert_eq!(path, missing);
