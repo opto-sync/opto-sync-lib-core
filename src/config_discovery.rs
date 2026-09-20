@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    fs,
     path::{Path, PathBuf},
     sync::OnceLock,
 };
@@ -50,16 +49,6 @@ pub enum OptoSyncConfigDiscoveryError {
     Config(#[from] OptoSyncConfigError),
 }
 
-fn starting_directory(start: &Path) -> PathBuf {
-    let canonical = fs::canonicalize(start).unwrap_or_else(|_| start.to_path_buf());
-    match fs::symlink_metadata(&canonical) {
-        Ok(metadata) if metadata.is_file() => canonical
-            .parent()
-            .map_or_else(|| canonical.clone(), Path::to_path_buf),
-        _ => canonical,
-    }
-}
-
 #[must_use]
 pub fn is_repo_root(directory: &Path) -> bool {
     directory.join(".git").is_dir()
@@ -73,23 +62,18 @@ pub fn is_repo_root(directory: &Path) -> bool {
 /// here would create a second authority that conflicts with the reviewed fleet
 /// registry and `opto_sync_config` contract.
 ///
-/// Discovery canonicalizes the start when possible, is bounded to 64 ancestors,
-/// rejects symlink/non-regular config leaves before reading, and never crosses
-/// the first Git boundary. A config beside a worktree/submodule `.git` file may
-/// still be selected, but is reported as non-root placement.
+/// Shared discovery owns start-path canonicalization (including file starts),
+/// the 64-ancestor cap, Git-boundary handling, and symlink refusal. Opto Sync
+/// owns only its stricter non-regular-leaf policy, strict repository-root
+/// placement, warning, and missing-config semantics.
 pub fn discover_opto_sync_config(
     start: impl AsRef<Path>,
 ) -> Result<DiscoveredOptoSyncConfig, OptoSyncConfigDiscoveryError> {
-    let start = starting_directory(start.as_ref());
+    let start = start.as_ref();
 
-    // The walk is the fleet-wide primitive (ores-config-discovery): at most 64
-    // ancestors, never past the first Git boundary of either kind, symlinked
-    // leaves refused. This crate's own policy stays here: a non-regular leaf is
-    // an error rather than skipped, only a `.git` *directory* is root
-    // placement, and a missing config is NotFound.
     let located = ores_config_discovery::Search::new(OPTO_SYNC_CONFIG_FILENAME)
         .refuse_non_regular(true)
-        .from(&start)
+        .from(start)
         .map_err(|error| match error {
             ores_config_discovery::DiscoveryError::Unreadable { path, kind } => {
                 OptoSyncConfigDiscoveryError::Metadata {
@@ -102,11 +86,13 @@ pub fn discover_opto_sync_config(
                 OptoSyncConfigDiscoveryError::UnsafeConfigLeaf { path }
             }
             _ => OptoSyncConfigDiscoveryError::NotFound {
-                start: start.clone(),
+                start: start.to_path_buf(),
             },
         })?;
     let Some(located) = located else {
-        return Err(OptoSyncConfigDiscoveryError::NotFound { start });
+        return Err(OptoSyncConfigDiscoveryError::NotFound {
+            start: start.to_path_buf(),
+        });
     };
     let discovered = DiscoveredOptoSyncConfig {
         at_repository_root: located.beside_git_directory(),
@@ -214,6 +200,22 @@ mod tests {
         let found = discover_opto_sync_config(&start).expect("discover nearest");
         assert_eq!(found.path, nested.join(OPTO_SYNC_CONFIG_FILENAME));
         assert!(!found.at_repository_root);
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn file_start_uses_shared_parent_directory_semantics() {
+        let root = scratch("file-start");
+        fs::create_dir_all(root.join(".git")).expect("git dir");
+        let config = root.join(OPTO_SYNC_CONFIG_FILENAME);
+        fs::write(&config, "version = 1\n").expect("config");
+        let source = root.join("src/main.rs");
+        fs::create_dir_all(source.parent().expect("source parent")).expect("source parent dir");
+        fs::write(&source, "fn main() {}\n").expect("source file");
+
+        let found = discover_opto_sync_config(&source).expect("file start discovers parent config");
+        assert_eq!(found.path, config);
+        assert!(found.at_repository_root);
         fs::remove_dir_all(root).expect("cleanup");
     }
 
