@@ -51,7 +51,13 @@ pub enum OptoSyncConfigDiscoveryError {
 
 #[must_use]
 pub fn is_repo_root(directory: &Path) -> bool {
-    fs::symlink_metadata(directory.join(".git")).is_ok_and(|metadata| metadata.file_type().is_dir())
+    std::fs::symlink_metadata(directory.join(".git"))
+        .is_ok_and(|metadata| metadata.file_type().is_dir())
+}
+
+#[cfg(test)]
+fn has_git_boundary(directory: &Path) -> bool {
+    std::fs::symlink_metadata(directory.join(".git")).is_ok()
 }
 
 /// Finds the nearest canonical Opto Sync config while walking from `start`
