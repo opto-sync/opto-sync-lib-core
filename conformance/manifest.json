@@ -1,0 +1,22 @@
+{
+  "schema": "opto-sync.implementation-conformance.v1",
+  "repository": "opto-sync/opto-sync-lib-core",
+  "claims": [
+    {
+      "id": "rust-runtime",
+      "implementation": ["src/", "admin-orm/"],
+      "commands": [
+        "cargo clippy --all-targets --all-features -- -D warnings",
+        "cargo test --all-targets --all-features",
+        "cargo test --manifest-path admin-orm/Cargo.toml --all-targets --all-features"
+      ]
+    },
+    {
+      "id": "opto-sync-config-projection",
+      "implementation": ["src/opto_sync_config.rs", "config-source.json"],
+      "authority": "opto-sync/opto-sync-interfaces",
+      "parity_gate": "ORESoftware/typespec-json-schema-validator"
+    }
+  ],
+  "excluded_claims": ["conflict-resolution", "causal-consistency", "crdt-or-ot-convergence"]
+}

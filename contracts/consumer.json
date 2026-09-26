@@ -1,0 +1,10 @@
+{
+  "schema": "opto-sync.contract-consumer.v1",
+  "repository": "opto-sync/opto-sync-lib-core",
+  "authority": false,
+  "source_manifest": "config-source.json",
+  "authority_repository": "opto-sync/opto-sync-interfaces",
+  "peer_authority_kinds": ["typespec", "json-schema-draft-2020-12"],
+  "parity_gate": "ORESoftware/typespec-json-schema-validator",
+  "runtime_projection": "src/opto_sync_config.rs"
+}
